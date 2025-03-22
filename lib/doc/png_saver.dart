@@ -27,6 +27,10 @@ void saveDocToPng(Document doc) async {
   );
   var bs = await image.toByteData(format: ImageByteFormat.png);
   var bytes = bs!.buffer.asUint8List();
-  var file = File('test.png');
+
+  // Save to file doc.path + '.png'
+  String path = doc.path;
+  path = path.replaceAll('.pixa', '.png');
+  var file = File(path);
   file.writeAsBytesSync(bytes);
 }

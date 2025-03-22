@@ -7,7 +7,7 @@ class DocPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    _doc.draw(canvas, size);
+    _doc.draw(canvas, size, true);
   }
 
   @override

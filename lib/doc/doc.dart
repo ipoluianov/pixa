@@ -1,23 +1,106 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
 class Document {
-
+  String signature = "PIXADOC";
   int width = 16;
   int height = 12;
   double pixelSize = 16.0;
   List<int> data = [];
+
+  Color mainColor = Color.fromARGB(255, 0, 0xA0, 0xE3);
 
   bool drawGrid = true;
   double gridStokeWidth = 0.1;
   bool gridOffset = false;
 
   bool drawBorder = false;
+  bool drawCenterLines = false;
+
+  String typeOfItem = "roundSquare";
+  double margin = 0.05;
+
+  String path = "";
 
   Document() {
     init();
+  }
+
+  String mainColorAsString() {
+    return mainColor.toARGB32().toRadixString(16);
+  }
+
+  void setMainColorFromString(String color) {
+    mainColor = Color(int.parse(color, radix: 16));
+  }
+
+  void loadFromJsonFile(String path) {
+    var file = File(path);
+    var json = file.readAsStringSync();
+    var success = loadFromJsonString(json);
+    if (success) {
+      this.path = path;
+    }
+  }
+
+  void saveToJsonFile() {
+    if (path.isEmpty) {
+      return;
+    }
+    var file = File(path);
+    var json = saveToJsonString();
+    file.writeAsStringSync(json);
+  }
+
+  String saveToJsonString() {
+    var map = {
+      'signature': signature,
+      'width': width,
+      'height': height,
+      'pixelSize': pixelSize,
+      'data': data,
+      'drawGrid': drawGrid,
+      'gridStokeWidth': gridStokeWidth,
+      'gridOffset': gridOffset,
+      'mainColorHex': mainColorAsString(),
+      'typeOfItem': typeOfItem,
+      'margin': margin,
+    };
+    return jsonEncode(map);
+  }
+
+  bool loadFromJsonString(String json) {
+    try {
+      var map = jsonDecode(json);
+      if (map['signature'] != signature) {
+        return false;
+      }
+
+      signature = map['signature'];
+      width = map['width'];
+      height = map['height'];
+      pixelSize = map['pixelSize'];
+      data = List<int>.from(map['data']);
+      drawGrid = map['drawGrid'];
+      gridStokeWidth = map['gridStokeWidth'];
+      gridOffset = map['gridOffset'];
+      if (map['mainColorHex'] != null) {
+        setMainColorFromString(map['mainColorHex']);
+      }
+      if (map['typeOfItem'] != null) {
+        typeOfItem = map['typeOfItem'];
+      }
+      if (map['margin'] != null) {
+        margin = map['margin'];
+      }
+
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   void init() {
@@ -51,12 +134,12 @@ class Document {
     return d;
   }
 
-  void draw(Canvas canvas, Size size) {
+  void draw(Canvas canvas, Size size, bool debug) {
     canvas.save();
     canvas.clipRect(Rect.fromLTWH(0, 0, size.width, size.height));
 
-    double marginX = 0.05;
-    double marginY = 0.05;
+    double marginX = margin;
+    double marginY = margin;
     double corner = 0.2;
 
     /*canvas.drawRect(
@@ -64,10 +147,10 @@ class Document {
       Paint()..color = Color.fromARGB(255, 5, 5, 5),
     );*/
 
-    if (drawGrid) {
+    if (drawGrid && gridStokeWidth > 0.001) {
       var gridPaint =
           Paint()
-            ..color = Color.fromARGB(255, 0, 0xA0, 0xE3)
+            ..color = mainColor
             ..strokeWidth = gridStokeWidth;
       // Draw grid
       var grOffsetX = gridOffset ? pixelSize / 2.0 : 0.0;
@@ -96,6 +179,26 @@ class Document {
           gridPaint,
         );
       }
+
+      if (drawCenterLines) {
+        var widthOfPicture = width * pixelSize;
+        var heightOfPicture = height * pixelSize;
+        var paintOfDebugCenterLines =
+            Paint()
+              ..color = Colors.red
+              ..strokeWidth = 0.5;
+        canvas.drawLine(
+          Offset(widthOfPicture / 2, 0),
+          Offset(widthOfPicture / 2, heightOfPicture),
+          paintOfDebugCenterLines,
+        );
+
+        canvas.drawLine(
+          Offset(0, heightOfPicture / 2),
+          Offset(widthOfPicture, heightOfPicture / 2),
+          paintOfDebugCenterLines,
+        );
+      }
     }
 
     for (int x = 0; x < width; x++) {
@@ -105,51 +208,62 @@ class Document {
         Color c = Colors.transparent;
         int pixelData = getPixel(x, y);
         if (pixelData > 0) {
-          c = Color.fromARGB(255, 0, 0xA0, 0xE3);
+          c = mainColor;
           // c = Color.fromARGB(255, 200, 200, 200);
         }
 
-        /*if (doc.drawGrid) {
-          var grOffsetX = doc.gridOffset ? doc.pixelSize / 2 : 0;
-          var grOffsetY = doc.gridOffset ? doc.pixelSize / 2 : 0;
+        var marginXInPixel = pixelSize * marginX;
+        var marginYInPixel = pixelSize * marginY;
 
-          canvas.drawRect(
-            Rect.fromLTWH(
-              posX + grOffsetX,
-              posY + grOffsetY,
-              doc.pixelSize,
-              doc.pixelSize,
+        if (typeOfItem == "roundSquare") {
+          canvas.drawRRect(
+            RRect.fromRectXY(
+              Rect.fromLTWH(
+                posX + marginXInPixel,
+                posY + marginYInPixel,
+                pixelSize - marginXInPixel * 2,
+                pixelSize - marginYInPixel * 2,
+              ),
+              pixelSize * corner,
+              pixelSize * corner,
             ),
             Paint()
-              ..style = PaintingStyle.stroke
-              ..color = Color.fromARGB(255, 0, 0xA0, 0xE3)
-              ..strokeWidth = gridStokeWidth,
+              ..style = PaintingStyle.fill
+              ..color = c
+              ..strokeWidth = 0.5,
           );
-        }*/
+        }
 
-        /*canvas.drawRect(
-          Rect.fromLTWH(posX, posY, pixelSize, pixelSize),
-          Paint()
-            ..style = PaintingStyle.fill
-            ..color = c,
-        );*/
-
-        canvas.drawRRect(
-          RRect.fromRectXY(
+        if (typeOfItem == "square") {
+          canvas.drawRect(
             Rect.fromLTWH(
-              posX + pixelSize * marginX,
-              posY + pixelSize * marginY,
-              pixelSize * 0.9 - pixelSize * marginX * 2,
-              pixelSize * 0.9 - pixelSize * marginY * 2,
+              posX + marginXInPixel,
+              posY + marginYInPixel,
+              pixelSize - marginXInPixel * 2,
+              pixelSize - marginYInPixel * 2,
             ),
-            pixelSize * corner,
-            pixelSize * corner,
-          ),
-          Paint()
-            ..style = PaintingStyle.fill
-            ..color = c
-            ..strokeWidth = 0.5,
-        );
+
+            Paint()
+              ..style = PaintingStyle.fill
+              ..color = c
+              ..strokeWidth = 0.5,
+          );
+        }
+
+        if (typeOfItem == "circle") {
+          canvas.drawOval(
+            Rect.fromLTWH(
+              posX + marginXInPixel,
+              posY + marginYInPixel,
+              pixelSize - marginXInPixel * 2,
+              pixelSize - marginYInPixel * 2,
+            ),
+            Paint()
+              ..style = PaintingStyle.fill
+              ..color = c
+              ..strokeWidth = 0.5,
+          );
+        }
       }
     }
 
